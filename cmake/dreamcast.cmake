@@ -154,7 +154,9 @@ set(platform_link_dirs
 if("$ENV{KOS_SUBARCH}" STREQUAL "naomi")
     set(CANNONBALL_NAOMI 1)
     add_definitions(-D__DREAMCAST__ -D__NAOMI__)
-    set(platform_extra_srcs "${CMAKE_CURRENT_LIST_DIR}/../src/main/naomi/naomi_stubs.c")
+    set(platform_extra_srcs
+        "${CMAKE_CURRENT_LIST_DIR}/../src/main/naomi/naomi_stubs.c"
+        "${CMAKE_CURRENT_LIST_DIR}/../src/main/naomi/dimmfs.c")
     # No CD: the ROMs, res/ and config.xml come from a romdisk object built by
     # naomi/make_romdisk.sh (never committed: it holds the ROMs).
     set(NAOMI_ROMDISK_OBJ "" CACHE FILEPATH "romdisk.o with roms/, res/ and config.xml for the NAOMI build")

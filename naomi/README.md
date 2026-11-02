@@ -34,7 +34,22 @@ $KOS_BASE/utils/naomibintool/naomibintool build build-naomi/cannonball_naomi.bin
   -t "CANNONBALL OUTRUN" -d "0SKARZER0" -e build-naomi/cannonball.elf
 ```
 
-`cannonball_naomi.bin` contains your ROMs: keep it to yourself.
+Music and FM effects, recorded from your ROMs and left in the NetDIMM
+(read on demand from /dimm, see `src/main/naomi/dimmfs.c`):
+
+```sh
+tools/render_audio.sh build-render                      # host tool, once
+naomi/render_audio.sh build-render/cannonball /path/to/outrun.zip build-naomi/dimm
+# optional: your own music as build-naomi/dimm/music/1.wav ... 4.wav
+#   (Yamaha ADPCM: ffmpeg -i in.flac -ac 2 -ar 44100 -c:a adpcm_yamaha 1.wav)
+naomi/pack_bin.py build-naomi/cannonball_naomi.bin build-naomi/dimm build-naomi/cannonball_full.bin
+gzip -9 build-naomi/cannonball_full.bin   # the WiPi netbooter wants .bin.gz
+```
+
+The netboot image contains your ROMs and recordings: keep it to yourself.
+
+Note for the WiPi Netbooter: upload plain `.bin` files fails (its uploader
+reads the last 4 bytes as a gzip size); always give it `.bin.gz`.
 
 ## Plan
 
@@ -44,8 +59,9 @@ $KOS_BASE/utils/naomibintool/naomibintool build build-naomi/cannonball_naomi.bin
    romdisk (`/rd/`) instead of `/cd/`; VMU, CD custom music and dcload paths
    disabled.
 3. **Audio**: the Dreamcast build streams pre-rendered music (Yamaha ADPCM)
-   from the CD. The NAOMI has no CD: first approach, smaller audio packed in
-   the romdisk; later, stream from the NetDIMM (ROM board reads).
+   from the CD. The NAOMI has no CD: the recordings are appended to the
+   netboot image and streamed from the NetDIMM through the cartridge port
+   (`/dimm`, `src/main/naomi/dimmfs.c`). Done.
 4. **Controls**: KOS maps the JVS wheel to `joyx` and the pedals to the
    triggers by default, the same as the Dreamcast pad. Map the shifter to
    high/low gear, START to start/coin.

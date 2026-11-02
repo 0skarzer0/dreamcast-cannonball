@@ -1265,6 +1265,9 @@ static int cannonball_main(int argc, char* argv[])
 #include <kos/fs_romdisk.h>
 extern "C" const uint8_t romdisk[];
 #endif
+#ifdef __NAOMI__
+#include "naomi/dimmfs.h"
+#endif
 
 #ifdef __DREAMCAST__
 struct dreamcast_main_args_t
@@ -1284,6 +1287,10 @@ int main(int argc, char* argv[])
 #if defined(__NAOMI__) && defined(NAOMI_ROMDISK)
     if (fs_romdisk_mount("/rd", romdisk, false) != 0)
         dbglog(DBG_ERROR, "cannonball: cannot mount the romdisk\n");
+#endif
+#ifdef __NAOMI__
+    // Big files (the music) left in the NetDIMM after the program: /dimm
+    dimmfs_init();
 #endif
 #ifndef __NAOMI__
     cont_btn_callback(0,

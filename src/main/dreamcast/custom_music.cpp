@@ -14,6 +14,9 @@
 
 #include "dreamcast/custom_music.hpp"
 #include "dreamcast/libwav/sndwav.h"
+#ifdef __NAOMI__
+#include "naomi/dimmfs.h"
+#endif
 #include "frontend/config.hpp"
 #include "engine/audio/commands.hpp"
 
@@ -220,7 +223,10 @@ namespace custommusic
     void init()
     {
 #ifdef __NAOMI__
-        const std::string dir = "/rd/music/";
+        // The music is read from the NetDIMM when the image carries it
+        // (naomi/pack_bin.py), else from the romdisk
+        const std::string root = dimmfs_mounted() ? "/dimm/" : "/rd/";
+        const std::string dir = root + "music/";
 #else
         const std::string dir = "/cd/music/";
 #endif
@@ -252,7 +258,7 @@ namespace custommusic
         {
             char fn[32];
 #ifdef __NAOMI__
-            snprintf(fn, sizeof(fn), "/rd/sfx/%02X.wav", FX_CMDS[i]);
+            snprintf(fn, sizeof(fn), "%ssfx/%02X.wav", dimmfs_mounted() ? "/dimm/" : "/rd/", FX_CMDS[i]);
 #else
             snprintf(fn, sizeof(fn), "/cd/sfx/%02X.wav", FX_CMDS[i]);
 #endif
