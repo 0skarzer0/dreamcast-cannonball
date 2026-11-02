@@ -1261,10 +1261,9 @@ static int cannonball_main(int argc, char* argv[])
 
 #if defined(__NAOMI__) && defined(NAOMI_ROMDISK)
 // NAOMI: no CD drive. ROMs, resources and config.xml are packed into a
-// romdisk linked into the program and mounted at /rd/.
-#include <kos/init.h>
-extern uint8_t romdisk[];
-KOS_INIT_ROMDISK(romdisk);
+// romdisk linked into the program (naomi/make_romdisk.sh) and mounted at /rd/.
+#include <kos/fs_romdisk.h>
+extern "C" const uint8_t romdisk[];
 #endif
 
 #ifdef __DREAMCAST__
@@ -1282,6 +1281,10 @@ static void* dreamcast_main_thread(void* param)
 
 int main(int argc, char* argv[])
 {
+#if defined(__NAOMI__) && defined(NAOMI_ROMDISK)
+    if (fs_romdisk_mount("/rd", romdisk, false) != 0)
+        dbglog(DBG_ERROR, "cannonball: cannot mount the romdisk\n");
+#endif
 #ifndef __NAOMI__
     cont_btn_callback(0,
         CONT_START | CONT_A | CONT_B | CONT_X | CONT_Y,

@@ -257,7 +257,7 @@ if(WIN32)
   set(SRCS ${SRCS} ../res/cannonball.rc)
 endif(WIN32)
 
-add_executable(cannonball ${SRCS})
+add_executable(cannonball ${SRCS} ${platform_extra_srcs})
 
 # -----------------------------------------------------------------------------
 # Compiler Definitions
