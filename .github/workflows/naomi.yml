@@ -1,0 +1,65 @@
+name: Naomi build
+
+on:
+  push:
+  workflow_dispatch:
+
+env:
+  # KallistiOS revision used for the toolchain and the library.
+  KOS_COMMIT: d81aa3fda0520b6ca64098ce9d1d43e7562142d9
+  DC: /opt/toolchains/dc
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential git cmake texinfo bison flex \
+            libgmp-dev libmpfr-dev libmpc-dev libisl-dev libelf-dev \
+            libjpeg-dev libpng-dev python3 wget curl
+          sudo mkdir -p "$DC" && sudo chown "$USER" "$DC"
+
+      - name: Get KallistiOS
+        run: |
+          git clone https://github.com/KallistiOS/KallistiOS "$DC/kos"
+          git -C "$DC/kos" checkout "$KOS_COMMIT"
+
+      - name: Restore SH-4 toolchain from cache
+        id: chain
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.DC }}/sh-elf
+          key: sh-elf-${{ env.KOS_COMMIT }}
+
+      - name: Build SH-4 toolchain (first run only, slow)
+        if: steps.chain.outputs.cache-hit != 'true'
+        run: |
+          cd "$DC/kos/utils/kos-chain"
+          cp Makefile.dreamcast.cfg Makefile.cfg
+          sed -i "s/^makejobs=.*/makejobs=$(nproc)/" Makefile.cfg
+          sed -i "s/^enable_objc=.*/enable_objc=0/; s/^enable_objcpp=.*/enable_objcpp=0/" Makefile.cfg
+          make
+          make distclean || true
+
+      - name: Build KallistiOS for NAOMI
+        run: |
+          cp "$DC/kos/doc/environ.sh.sample" "$DC/kos/environ.sh"
+          sed -i 's/^#export KOS_SUBARCH="naomi"/export KOS_SUBARCH="naomi"/' "$DC/kos/environ.sh"
+          source "$DC/kos/environ.sh"
+          make -C "$KOS_BASE" -j"$(nproc)"
+          make -C "$KOS_BASE/utils/naomibintool"
+
+      - name: Build JVS test
+        run: |
+          source "$DC/kos/environ.sh"
+          make -C naomi/jvstest
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: naomi-bins
+          path: |
+            naomi/jvstest/jvstest.bin
