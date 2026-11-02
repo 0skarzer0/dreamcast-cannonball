@@ -179,6 +179,12 @@ static void process_events(void)
                 break;
         }
     }
+
+#ifdef __NAOMI__
+    // NAOMI: the cabinet controls come from the JVS I/O board through the
+    // MIE, which SDL does not see. Read them directly every frame.
+    input.poll_naomi();
+#endif
 }
 
 #ifdef SCORE_SIM
@@ -1253,6 +1259,14 @@ static int cannonball_main(int argc, char* argv[])
     return 0;
 }
 
+#if defined(__NAOMI__) && defined(NAOMI_ROMDISK)
+// NAOMI: no CD drive. ROMs, resources and config.xml are packed into a
+// romdisk linked into the program and mounted at /rd/.
+#include <kos/init.h>
+extern uint8_t romdisk[];
+KOS_INIT_ROMDISK(romdisk);
+#endif
+
 #ifdef __DREAMCAST__
 struct dreamcast_main_args_t
 {
@@ -1268,9 +1282,11 @@ static void* dreamcast_main_thread(void* param)
 
 int main(int argc, char* argv[])
 {
+#ifndef __NAOMI__
     cont_btn_callback(0,
         CONT_START | CONT_A | CONT_B | CONT_X | CONT_Y,
         (cont_btn_callback_t)arch_exit);
+#endif
 
     dreamcast_main_args_t args = { argc, argv };
     kthread_attr_t attr = {};

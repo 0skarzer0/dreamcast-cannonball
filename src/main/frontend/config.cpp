@@ -194,9 +194,17 @@ namespace
 }
 #endif
 
+// Where the game's files are: the CD on the Dreamcast, the romdisk linked
+// into the program on the NAOMI (no CD drive there).
+#ifdef __NAOMI__
+#define DC_DISC_ROOT "/rd/"
+#else
+#define DC_DISC_ROOT "/cd/"
+#endif
+
 Config::Config(void)
 {
-    data.cfg_file = "/cd/config.xml";
+    data.cfg_file = DC_DISC_ROOT "config.xml";
     
     // Setup default sounds
     music_t magical, breeze, splash;
@@ -261,9 +269,15 @@ void Config::load()
         DC_TRACE("cannonball: Config::load read config bytes=%u\n", static_cast<unsigned>(dc_xml.size()));
     }
 
-    data.rom_path         = dc_xml_string(dc_xml, "data.rompath", "/cd/roms/");
-    data.res_path         = dc_xml_string(dc_xml, "data.respath", "/cd/res/");
-    data.save_path        = dc_xml_string(dc_xml, "data.savepath", "/cd/");
+    data.rom_path         = dc_xml_string(dc_xml, "data.rompath", DC_DISC_ROOT "roms/");
+    data.res_path         = dc_xml_string(dc_xml, "data.respath", DC_DISC_ROOT "res/");
+    data.save_path        = dc_xml_string(dc_xml, "data.savepath", DC_DISC_ROOT);
+#ifdef __NAOMI__
+    // A config.xml written for the disc still says /cd/
+    dc_replace_prefix(data.rom_path, "/cd/", "/rd/");
+    dc_replace_prefix(data.res_path, "/cd/", "/rd/");
+    dc_replace_prefix(data.save_path, "/cd/", "/rd/");
+#endif
     data.crc32            = dc_xml_int(dc_xml, "data.crc32", 1);
     data.crc32            = 0;
 
@@ -412,6 +426,11 @@ void Config::load()
         dc_xml_cache = dc_xml;
     if (!skip_vmu)
         vmu_load_config();
+#ifdef __NAOMI__
+    // Cabinet: real wheel and pedals, two-position shifter (low / high)
+    controls.analog = 1;
+    controls.gear   = controls.GEAR_SEPARATE;
+#endif
     DC_TRACE("cannonball: Config::load dreamcast parser done\n");
     return;
 #else

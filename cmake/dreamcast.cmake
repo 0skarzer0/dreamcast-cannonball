@@ -144,3 +144,23 @@ set(platform_link_libs
 # Platform Specific Link Directories
 set(platform_link_dirs
 )
+
+# -----------------------------------------------------------------------------
+# SEGA NAOMI (KOS_SUBARCH=naomi)
+# -----------------------------------------------------------------------------
+# KallistiOS defines __NAOMI__ instead of __DREAMCAST__ for the NAOMI. The game
+# treats the NAOMI as a Dreamcast variant, so define both (KallistiOS itself
+# does not test __DREAMCAST__).
+if("$ENV{KOS_SUBARCH}" STREQUAL "naomi")
+    set(CANNONBALL_NAOMI 1)
+    add_definitions(-D__DREAMCAST__ -D__NAOMI__)
+    # No CD: the ROMs, res/ and config.xml come from a romdisk object built by
+    # naomi/make_romdisk.sh (never committed: it holds the ROMs).
+    set(NAOMI_ROMDISK_OBJ "" CACHE FILEPATH "romdisk.o with roms/, res/ and config.xml for the NAOMI build")
+    if(NAOMI_ROMDISK_OBJ)
+        list(APPEND platform_link_libs "${NAOMI_ROMDISK_OBJ}")
+        add_definitions(-DNAOMI_ROMDISK)
+    else()
+        message(WARNING "NAOMI build without NAOMI_ROMDISK_OBJ: the program will not find its ROMs")
+    endif()
+endif()

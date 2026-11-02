@@ -2,7 +2,11 @@ name: Naomi build
 
 on:
   push:
+    branches: [naomi]
   workflow_dispatch:
+
+permissions:
+  contents: write   # publish the "naomi-latest" release
 
 env:
   # KallistiOS revision used for the toolchain and the library.
@@ -20,7 +24,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential git cmake texinfo bison flex \
             libgmp-dev libmpfr-dev libmpc-dev libisl-dev libelf-dev \
-            libjpeg-dev libpng-dev python3 wget curl
+            libjpeg-dev libpng-dev python3 wget curl zstd
           sudo mkdir -p "$DC" && sudo chown "$USER" "$DC"
 
       - name: Get KallistiOS
@@ -30,7 +34,7 @@ jobs:
 
       - name: Restore SH-4 toolchain from cache
         id: chain
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: ${{ env.DC }}/sh-elf
           key: sh-elf-${{ env.KOS_COMMIT }}
@@ -45,6 +49,13 @@ jobs:
           make
           make distclean || true
 
+      - name: Save SH-4 toolchain to cache
+        if: steps.chain.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.DC }}/sh-elf
+          key: sh-elf-${{ env.KOS_COMMIT }}
+
       - name: Build KallistiOS for NAOMI
         run: |
           cp "$DC/kos/doc/environ.sh.sample" "$DC/kos/environ.sh"
@@ -52,14 +63,52 @@ jobs:
           source "$DC/kos/environ.sh"
           make -C "$KOS_BASE" -j"$(nproc)"
           make -C "$KOS_BASE/utils/naomibintool"
+          make -C "$KOS_BASE/utils/genromfs"
 
       - name: Build JVS test
         run: |
           source "$DC/kos/environ.sh"
           make -C naomi/jvstest
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: naomi-bins
-          path: |
-            naomi/jvstest/jvstest.bin
+      # From here on the game's libraries and code. KallistiOS defines
+      # __NAOMI__ instead of __DREAMCAST__; SDL2 and the game expect the
+      # latter, so naomi/env.sh adds it (KallistiOS itself does not use it).
+      - name: Build GLdc and SDL2 for NAOMI
+        run: |
+          source naomi/env.sh
+          git clone https://github.com/KallistiOS/kos-ports "$DC/kos-ports"
+          make -C "$DC/kos-ports/libGL" install clean
+          git clone -b dreamcastSDL2 --depth 1 https://github.com/GPF/SDL "$DC/SDL2-dc"
+          cd "$DC/SDL2-dc/build-scripts"
+          ./dreamcast.sh install
+
+      - name: Build Cannonball for NAOMI (without ROMs, compile check)
+        run: |
+          source naomi/env.sh
+          kos-cmake -S cmake -B build-naomi \
+            -DTARGET=dreamcast.cmake -DCMAKE_BUILD_TYPE=Release \
+            -DSDL2_DIR="$KOS_BASE/addons/lib/dreamcast/cmake/SDL2"
+          cmake --build build-naomi -j"$(nproc)"
+
+      - name: Package the NAOMI SDK
+        if: always()
+        run: |
+          rm -rf "$DC/SDL2-dc"
+          tar -C "$DC" -I 'zstd -T0 -12' -cf kos-naomi-sdk.tar.zst sh-elf kos kos-ports || true
+          ls -la kos-naomi-sdk.tar.zst || true
+
+      - name: Publish release "naomi-latest"
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          files=""
+          for f in naomi/jvstest/jvstest.bin kos-naomi-sdk.tar.zst; do
+            [ -f "$f" ] && files="$files $f"
+          done
+          [ -n "$files" ] || exit 0
+          gh release view naomi-latest >/dev/null 2>&1 || \
+            gh release create naomi-latest --prerelease --target naomi \
+              --title "NAOMI test builds" \
+              --notes "Automatic builds of the naomi branch. jvstest.bin: JVS test to netboot. No ROMs included."
+          gh release upload naomi-latest $files --clobber

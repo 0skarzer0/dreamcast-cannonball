@@ -492,3 +492,68 @@ void Input::set_rumble(bool enable, float strength)
     else
         SDL_HapticRumbleStop(haptic);
 }
+
+#ifdef __NAOMI__
+// ------------------------------------------------------------------------------------------------
+// NAOMI: read the cabinet controls from the JVS I/O board.
+//
+// KallistiOS's MIE driver maps the JVS inputs onto a Dreamcast controller
+// state: wheel -> joyx (-128..127), accelerator -> rtrig, brake -> ltrig
+// (0..255), and the player 1 switches onto the buttons. On the Crazy Taxi
+// cabinet the Drive/Reverse shifter sets UP/DOWN.
+//
+//   Wheel              steering (and LEFT/RIGHT in the menus)
+//   Accelerator/brake  analog pedals
+//   Shifter forward    low gear  (and UP in the menus)
+//   Shifter back       high gear (and DOWN in the menus)
+//   START              start / select
+//   TEST (service panel) menu
+// ------------------------------------------------------------------------------------------------
+#include <dc/maple.h>
+#include <dc/maple/controller.h>
+#include <dc/maple/mie.h>
+
+void Input::poll_naomi()
+{
+    maple_device_t* dev = maple_enum_type(0, MAPLE_FUNC_MIE);
+    if (dev == NULL)
+        return;
+
+    const mie_state_t* st = (const mie_state_t*)maple_dev_status(dev);
+    if (st == NULL)
+        return;
+
+    const cont_state_t& c = st->cont;
+
+    gamepad = true;
+    analog  = 1;    // a real wheel and real pedals
+
+    // Steering: OutRun wants 0x40 (full left) .. 0xC0 (full right), 0x80 centre
+    wheel = c.joyx + 0x80;                  // raw value, for the cab diagnostics
+    int adjusted = CENTRE + c.joyx / 2;
+    if (wheel_zone)
+        adjusted = CENTRE + ((adjusted - CENTRE) * (100 + wheel_zone)) / 100;
+    if (adjusted < 0x40) adjusted = 0x40;
+    if (adjusted > 0xC0) adjusted = 0xC0;
+    if (wheel_dead && std::abs(CENTRE - adjusted) <= wheel_dead)
+        adjusted = CENTRE;
+    a_wheel = adjusted;
+
+    // Pedals
+    a_accel = c.rtrig;
+    a_brake = c.ltrig;
+    keys[ACCEL] = a_accel > 0x80;
+    keys[BRAKE] = a_brake > 0x80;
+
+    // Shifter and buttons
+    const uint32_t b = c.buttons;
+    keys[GEAR1] = (b & CONT_DPAD_UP)   != 0;
+    keys[GEAR2] = (b & CONT_DPAD_DOWN) != 0;
+    keys[UP]    = (b & CONT_DPAD_UP)   != 0;
+    keys[DOWN]  = (b & CONT_DPAD_DOWN) != 0;
+    keys[LEFT]  = c.joyx < -64;
+    keys[RIGHT] = c.joyx >  64;
+    keys[START] = (b & CONT_START) != 0;
+    keys[MENU]  = (b & CONT_C)     != 0;    // TEST button on the service panel
+}
+#endif

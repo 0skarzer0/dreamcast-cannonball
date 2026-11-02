@@ -101,6 +101,11 @@ public:
     bool brake_held();
     void set_rumble(bool, float strength = 1.0f);
 
+#ifdef __NAOMI__
+    // NAOMI cabinet controls (JVS I/O board through the MIE), read once per frame
+    void poll_naomi();
+#endif
+
 private:
     static const int CENTRE = 0x80;
 

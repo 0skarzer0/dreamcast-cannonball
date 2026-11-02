@@ -219,7 +219,11 @@ namespace custommusic
 
     void init()
     {
+#ifdef __NAOMI__
+        const std::string dir = "/rd/music/";
+#else
         const std::string dir = "/cd/music/";
+#endif
         for (int t = 0; t < TRACKS; t++)
         {
             files[t].clear();
@@ -247,7 +251,11 @@ namespace custommusic
         for (int i = 0; i < FX_COUNT; i++)
         {
             char fn[32];
+#ifdef __NAOMI__
+            snprintf(fn, sizeof(fn), "/rd/sfx/%02X.wav", FX_CMDS[i]);
+#else
             snprintf(fn, sizeof(fn), "/cd/sfx/%02X.wav", FX_CMDS[i]);
+#endif
             fx_files[i] = exists(fn) ? fn : "";
             fx[i] = SFXHND_INVALID;
         }
