@@ -513,6 +513,32 @@ void Input::set_rumble(bool enable, float strength)
 #include <dc/maple/controller.h>
 #include <dc/maple/mie.h>
 
+// Raw JVS values measured on the Crazy Taxi cabinet (JVS test, 2026-11-02).
+// The limits widen by themselves if a control goes further than this.
+static int naomi_wheel_min    =  8448;
+static int naomi_wheel_centre = 33792;
+static int naomi_wheel_max    = 60160;
+static int naomi_accel_min    = 11776;
+static int naomi_accel_max    = 47104;
+static int naomi_brake_min    = 14080;
+static int naomi_brake_max    = 47360;
+
+// Pedal travel left out at each end: rest jitter, and full press reaching 255
+static const int NAOMI_PEDAL_MARGIN = 6;    // percent
+
+static int naomi_pedal(int raw, int& lo, int& hi)
+{
+    if (raw < lo) lo = raw;
+    if (raw > hi) hi = raw;
+    const int span   = hi - lo;
+    const int margin = span * NAOMI_PEDAL_MARGIN / 100;
+    const int from   = lo + margin;
+    const int to     = hi - margin;
+    if (raw <= from) return 0;
+    if (raw >= to)   return 0xFF;
+    return (raw - from) * 0xFF / (to - from);
+}
+
 void Input::poll_naomi()
 {
     maple_device_t* dev = maple_enum_type(0, MAPLE_FUNC_MIE);
@@ -523,14 +549,25 @@ void Input::poll_naomi()
     if (st == NULL)
         return;
 
+    const mie_jvs_inputs_t& j = st->jvs;
     const cont_state_t& c = st->cont;
 
     gamepad = true;
     analog  = 1;    // a real wheel and real pedals
 
-    // Steering: OutRun wants 0x40 (full left) .. 0xC0 (full right), 0x80 centre
-    wheel = c.joyx + 0x80;                  // raw value, for the cab diagnostics
-    int adjusted = CENTRE + c.joyx / 2;
+    // Steering: raw JVS value -> -128..127, separately each side of the centre
+    const int raw = j.wheel;
+    if (raw < naomi_wheel_min) naomi_wheel_min = raw;
+    if (raw > naomi_wheel_max) naomi_wheel_max = raw;
+    int steer;
+    if (raw < naomi_wheel_centre)
+        steer = -((naomi_wheel_centre - raw) * 128) / (naomi_wheel_centre - naomi_wheel_min);
+    else
+        steer =  ((raw - naomi_wheel_centre) * 127) / (naomi_wheel_max - naomi_wheel_centre);
+
+    // OutRun wants 0x40 (full left) .. 0xC0 (full right), 0x80 centre
+    wheel = steer + 0x80;                   // for the cab diagnostics
+    int adjusted = CENTRE + steer / 2;
     if (wheel_zone)
         adjusted = CENTRE + ((adjusted - CENTRE) * (100 + wheel_zone)) / 100;
     if (adjusted < 0x40) adjusted = 0x40;
@@ -540,19 +577,20 @@ void Input::poll_naomi()
     a_wheel = adjusted;
 
     // Pedals
-    a_accel = c.rtrig;
-    a_brake = c.ltrig;
+    a_accel = naomi_pedal(j.accel, naomi_accel_min, naomi_accel_max);
+    a_brake = naomi_pedal(j.brake, naomi_brake_min, naomi_brake_max);
     keys[ACCEL] = a_accel > 0x80;
     keys[BRAKE] = a_brake > 0x80;
 
-    // Shifter and buttons
+    // Shifter (springs back to the middle): forward (D) = low gear,
+    // back (R) = high gear. Also UP/DOWN in the menus.
     const uint32_t b = c.buttons;
     keys[GEAR1] = (b & CONT_DPAD_UP)   != 0;
     keys[GEAR2] = (b & CONT_DPAD_DOWN) != 0;
     keys[UP]    = (b & CONT_DPAD_UP)   != 0;
     keys[DOWN]  = (b & CONT_DPAD_DOWN) != 0;
-    keys[LEFT]  = c.joyx < -64;
-    keys[RIGHT] = c.joyx >  64;
+    keys[LEFT]  = steer < -64;
+    keys[RIGHT] = steer >  64;
     keys[START] = (b & CONT_START) != 0;
     keys[MENU]  = (b & CONT_C)     != 0;    // TEST button on the service panel
 }
