@@ -54,6 +54,7 @@ namespace custommusic
         int  playing     = -1;          // track index, -1 = none
         bool playing_orig = false;
         wav_stream_hnd_t hnd = SND_STREAM_INVALID;
+        std::string extra_fn;           // extra track playing (index TRACKS)
 
         // The FM chip is still needed while it plays music, or for a moment
         // after it was sent an effect we have no recording of
@@ -197,20 +198,21 @@ namespace custommusic
                 lib_ready = true;
             }
             destroy_stream();
-            const std::string& fn = playing_orig ? orig[track] : files[track];
-            const bool loops = !playing_orig || orig_loop[track] >= 0;
+            const bool extra = track >= TRACKS;
+            const std::string& fn = extra ? extra_fn : (playing_orig ? orig[track] : files[track]);
+            const bool loops = extra || !playing_orig || orig_loop[track] >= 0;
             hnd = wav_create(fn.c_str(), loops ? 1 : 0);
             if (hnd == SND_STREAM_INVALID)
             {
                 dbglog(DBG_INFO, "cannonball: music: cannot open %s\n", fn.c_str());
                 return false;
             }
-            if (playing_orig && orig_loop[track] > 0)
+            if (!extra && playing_orig && orig_loop[track] > 0)
             {
                 // Recordings are 4-bit stereo ADPCM: one byte per sample frame
                 wav_set_loop_start(hnd, (uint32_t)orig_loop[track]);
             }
-            wav_volume(hnd, playing_orig ? VOLUME_ORIG : VOLUME_CUSTOM);
+            wav_volume(hnd, (playing_orig && !extra) ? VOLUME_ORIG : VOLUME_CUSTOM);
 #ifdef DREAMCAST_DEBUG_MUSIC
             wav_add_filter(hnd, debug_filter, NULL);
 #endif
@@ -376,6 +378,25 @@ namespace custommusic
     bool fm_chip_needed()
     {
         return chip_music || timer_ms_gettime64() < chip_fx_until;
+    }
+
+    bool play_file(const char* path)
+    {
+        if (config.sound.custom_music == 2)     // music off
+        {
+            stop();
+            return false;
+        }
+        chip_music = false;
+        if (playing == TRACKS && extra_fn == path && hnd != SND_STREAM_INVALID)
+            return true;                        // already playing it
+        extra_fn = path;
+        playing = TRACKS;
+        playing_orig = false;
+        paused = false;
+        if (!suspended)
+            return start(TRACKS);
+        return true;
     }
 
     void stop()

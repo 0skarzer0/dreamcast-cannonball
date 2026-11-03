@@ -50,6 +50,12 @@ namespace custommusic
     // Stop any custom track (e.g. when switching back to original music)
     void stop();
 
+    // Play (looping) an extra track chosen on the music selection screen:
+    // a WAV file (Yamaha ADPCM or PCM) streamed by the AICA. The extra
+    // tracks are listed in <root>/music/extra/tracks.txt, see
+    // Config::load(); on the NAOMI they live in the NetDIMM (/dimm).
+    bool play_file(const char* path);
+
     // Sound system restarts (SDL audio shuts all AICA streams down)
     void suspend();
     void resume();

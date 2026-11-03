@@ -42,6 +42,8 @@ tools/render_audio.sh build-render                      # host tool, once
 naomi/render_audio.sh build-render/cannonball /path/to/outrun.zip build-naomi/dimm
 # optional: your own music as build-naomi/dimm/music/1.wav ... 4.wav
 #   (Yamaha ADPCM: ffmpeg -i in.flac -ac 2 -ar 44100 -c:a adpcm_yamaha 1.wav)
+# optional: extra tracks for the music selection screen, as
+#   build-naomi/dimm/music/extra/1.wav ... plus tracks.txt ("1.wav|TITLE" per line)
 naomi/pack_bin.py build-naomi/cannonball_naomi.bin build-naomi/dimm build-naomi/cannonball_full.bin
 gzip -9 build-naomi/cannonball_full.bin   # the WiPi netbooter wants .bin.gz
 ```

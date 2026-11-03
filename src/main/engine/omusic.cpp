@@ -7,6 +7,9 @@
     See license.txt for more details.
 ***************************************************************************/
 
+#ifdef __DREAMCAST__
+#include "dreamcast/custom_music.hpp"
+#endif
 #include "main.hpp"
 #include "engine/oferrari.hpp"
 #include "engine/ohud.hpp"
@@ -282,7 +285,12 @@ void OMusic::play_music(int index)
             break;
 
         case music_t::IS_WAV:
+#ifdef __DREAMCAST__
+            // Streamed by the AICA from the disc / NetDIMM (full path)
+            custommusic::play_file(next_track->filename.c_str());
+#else
             cannonball::audio.load_wav((config.data.res_path + next_track->filename).c_str());
+#endif
             break;
     }
 

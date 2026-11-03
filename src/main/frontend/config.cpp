@@ -194,6 +194,11 @@ namespace
 }
 #endif
 
+#ifdef __NAOMI__
+#include "naomi/dimmfs.h"
+#endif
+#include <algorithm>
+
 // Where the game's files are: the CD on the Dreamcast, the romdisk linked
 // into the program on the NAOMI (no CD drive there).
 #ifdef __NAOMI__
@@ -426,6 +431,43 @@ void Config::load()
         dc_xml_cache = dc_xml;
     if (!skip_vmu)
         vmu_load_config();
+
+    // Extra music tracks for the selection screen: <root>/music/extra/
+    // tracks.txt, one "file|TITLE" per line (files next to it, streamed)
+    {
+        for (size_t i = sound.music.size(); i-- > 0;)
+            if (sound.music[i].type == music_t::IS_WAV)
+                sound.music.erase(sound.music.begin() + i);
+#ifdef __NAOMI__
+        const std::string extra_dir = std::string(dimmfs_mounted() ? "/dimm/" : "/rd/") + "music/extra/";
+#else
+        const std::string extra_dir = "/cd/music/extra/";
+#endif
+        std::string list;
+        if (dc_read_file(extra_dir + "tracks.txt", list))
+        {
+            size_t pos = 0;
+            while (pos < list.size())
+            {
+                size_t end = list.find('\n', pos);
+                if (end == std::string::npos) end = list.size();
+                std::string line = list.substr(pos, end - pos);
+                pos = end + 1;
+                if (!line.empty() && line[line.size() - 1] == '\r') line.erase(line.size() - 1);
+                const size_t bar = line.find('|');
+                if (bar == std::string::npos || bar == 0) continue;
+                music_t m;
+                m.filename = extra_dir + line.substr(0, bar);
+                m.title    = line.substr(bar + 1);
+                std::transform(m.title.begin(), m.title.end(), m.title.begin(), ::toupper);
+                if (m.title.size() > 34) m.title.resize(34);
+                m.type     = music_t::IS_WAV;
+                m.cmd      = sound::MUSIC_CUSTOM;
+                sound.music.push_back(m);
+                DC_TRACE("cannonball: extra track %s: %s\n", m.title.c_str(), m.filename.c_str());
+            }
+        }
+    }
 #ifdef __NAOMI__
     // Cabinet: real wheel and pedals, two-position shifter (low / high)
     controls.analog = 1;
