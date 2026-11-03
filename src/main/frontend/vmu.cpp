@@ -413,7 +413,8 @@ namespace
     // NAOMI: no VMU. The same archive (settings and score tables) is kept in
     // the board's battery-backed SRAM (32 KB at 0x00200000, used uncached).
     //
-    //   0x00  "CBSR"           magic
+    //   0x00  "CBS2"           magic (was "CBSR": saves made before the
+    //                          NAOMI defaults changed are ignored once)
     //   0x04  uint32 size      VMU_ARCHIVE_SIZE
     //   0x08  uint32 checksum  of the archive
     //   0x10  archive
@@ -439,7 +440,7 @@ namespace
         uint8_t hdr[SRAM_HEADER];
         for (uint32_t i = 0; i < SRAM_HEADER; i++)
             hdr[i] = SRAM[i];
-        if (memcmp(hdr, "CBSR", 4) != 0 || read_le32(hdr + 4) != VMU_ARCHIVE_SIZE)
+        if (memcmp(hdr, "CBS2", 4) != 0 || read_le32(hdr + 4) != VMU_ARCHIVE_SIZE)
         {
             dbglog(DBG_INFO, "[SRAM] No saved data\n");
             return false;
@@ -457,7 +458,7 @@ namespace
 
     static bool write_archive(const uint8_t* data)
     {
-        uint8_t hdr[SRAM_HEADER] = { 'C', 'B', 'S', 'R' };
+        uint8_t hdr[SRAM_HEADER] = { 'C', 'B', 'S', '2' };
         write_le32(hdr + 4, VMU_ARCHIVE_SIZE);
         write_le32(hdr + 8, archive_checksum(data, VMU_ARCHIVE_SIZE));
         // Magic last: a power cut while writing leaves no valid header

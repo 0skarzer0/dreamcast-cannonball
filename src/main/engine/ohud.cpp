@@ -466,8 +466,21 @@ void OHud::blit_large_digit(uint32_t* addr, uint8_t digit)
 // Input:          None
 // Output:         None
 
+// NAOMI (a cabinet left on): no fixed text on the attract screens (driving
+// demo, high scores, title), so it cannot burn into the monitor. The START
+// lamp still flashes.
+static bool hide_attract_text()
+{
+#ifdef __NAOMI__
+    return outrun.game_state >= GS_ATTRACT && outrun.game_state <= GS_LOGO;
+#else
+    return false;
+#endif
+}
+
 void OHud::draw_copyright_text()
 {
+    if (hide_attract_text()) return;
     blit_text1(TEXT1_1986_SEGA);
     blit_text1(TEXT1_COPYRIGHT);
 }
@@ -477,6 +490,7 @@ void OHud::draw_copyright_text()
 // Source: 0xB7D0
 void OHud::draw_insert_coin()
 {
+    const bool hide = hide_attract_text();
     // Update text
     if ((outrun.tick_counter ^ (outrun.tick_counter - 1)) & BIT_4)
     {
@@ -485,12 +499,12 @@ void OHud::draw_insert_coin()
         {
             if (outrun.tick_counter & BIT_4)
             {
-                blit_text1(TEXT1_PRESS_START);
+                if (!hide) blit_text1(TEXT1_PRESS_START);
                 outrun.outputs->set_digital(OOutputs::D_START_LAMP);
             }
             else
             {
-                blit_text1(TEXT1_CLEAR_START);
+                if (!hide) blit_text1(TEXT1_CLEAR_START);
                 outrun.outputs->clear_digital(OOutputs::D_START_LAMP);
             }
         }
@@ -505,20 +519,20 @@ void OHud::draw_insert_coin()
                 if (outrun.tick_counter & BIT_4)
                 {                
                     // Blit each tile
-                    for (uint16_t i = 0; i < sizeof(PRESS_START); i++)
+                    for (uint16_t i = 0; i < sizeof(PRESS_START) && !hide; i++)
                         video.write_text16(&dst_addr, (0x8700 | PRESS_START[i]));
                     outrun.outputs->set_digital(OOutputs::D_START_LAMP);    // free play: flash the lamp too
                 }
                 else
                 {
-                    for (uint16_t i = 0; i < sizeof(PRESS_START); i++)
+                    for (uint16_t i = 0; i < sizeof(PRESS_START) && !hide; i++)
                         video.write_text16(&dst_addr, (0x8700 | 0x20));
                     outrun.outputs->clear_digital(OOutputs::D_START_LAMP);
                 }
             }
             else
             {
-                blit_text1((outrun.tick_counter & BIT_4) ? TEXT1_INSERT_COINS : TEXT1_CLEAR_COINS);
+                if (!hide) blit_text1((outrun.tick_counter & BIT_4) ? TEXT1_INSERT_COINS : TEXT1_CLEAR_COINS);
             }
         }
     }
@@ -527,6 +541,7 @@ void OHud::draw_insert_coin()
 // Source: 0x6CDE
 void OHud::draw_credits()
 {
+    if (hide_attract_text()) return;
     if (config.engine.freeplay)
     {
         blit_text1(TEXT1_FREEPLAY);

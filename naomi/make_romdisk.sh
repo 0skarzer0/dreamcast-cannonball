@@ -34,9 +34,13 @@ if [ "$N" -lt 31 ]; then
     exit 1
 fi
 
-# The disc's settings, with NAOMI defaults: no FPS counter, no VMU animation
+# The disc's settings, with NAOMI defaults: no FPS counter, no VMU animation,
+# timing fixes off, new attract mode off, enhanced level objects
 sed -e 's#<fps_counter>[0-9]*</fps_counter>#<fps_counter>0</fps_counter>#' \
     -e 's#<vmu_animation>[0-9]*</vmu_animation>#<vmu_animation>0</vmu_animation>#' \
+    -e 's#<fix_timer>[0-9]*</fix_timer>#<fix_timer>0</fix_timer>#' \
+    -e 's#<new_attract>[0-9]*</new_attract>#<new_attract>0</new_attract>#' \
+    -e 's#<levelobjects>[0-9]*</levelobjects>#<levelobjects>1</levelobjects>#' \
     "$REPO/build-dc/cd/config.xml" > "$RD/config.xml"
 cp "$REPO/build-dc/res/tilemap.bin" "$REPO/build-dc/res/tilepatch.bin" "$RD/res/"
 # SDL's controller database is not needed on the NAOMI (no SDL controllers)
