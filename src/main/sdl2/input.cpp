@@ -507,7 +507,7 @@ void Input::set_rumble(bool enable, float strength)
 //   Shifter forward    low gear  (and UP in the menus)
 //   Shifter back       high gear (and DOWN in the menus)
 //   START              start / select
-//   TEST (service panel) menu
+//   BRAKE + START      main menu (also TEST on the service panel)
 // ------------------------------------------------------------------------------------------------
 #include <dc/maple.h>
 #include <dc/maple/controller.h>
@@ -591,7 +591,11 @@ void Input::poll_naomi()
     keys[DOWN]  = (b & CONT_DPAD_DOWN) != 0;
     keys[LEFT]  = steer < -64;
     keys[RIGHT] = steer >  64;
-    keys[START] = (b & CONT_START) != 0;
-    keys[MENU]  = (b & CONT_C)     != 0;    // TEST button on the service panel
+    // BRAKE + START: back to the main menu (START alone pauses while
+    // driving). The TEST button on the service panel does the same.
+    const bool start = (b & CONT_START) != 0;
+    const bool menu_combo = start && a_brake > 0x80;
+    keys[START] = start && !menu_combo;
+    keys[MENU]  = menu_combo || (b & CONT_C) != 0;
 }
 #endif

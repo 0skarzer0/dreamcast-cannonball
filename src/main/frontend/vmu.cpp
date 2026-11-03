@@ -408,6 +408,69 @@ namespace
         pack_config(data);
     }
 
+#ifdef __NAOMI__
+    // ------------------------------------------------------------------------
+    // NAOMI: no VMU. The same archive (settings and score tables) is kept in
+    // the board's battery-backed SRAM (32 KB at 0x00200000, used uncached).
+    //
+    //   0x00  "CBSR"           magic
+    //   0x04  uint32 size      VMU_ARCHIVE_SIZE
+    //   0x08  uint32 checksum  of the archive
+    //   0x10  archive
+    //
+    // Another game run on the board may reuse the SRAM: a bad magic, size or
+    // checksum just means "nothing saved yet".
+    // ------------------------------------------------------------------------
+    static volatile uint8_t* const SRAM = (volatile uint8_t*)0xA0200000;
+    static const uint32_t SRAM_SIZE   = 0x8000;
+    static const uint32_t SRAM_HEADER = 16;
+
+    static uint32_t archive_checksum(const uint8_t* data, uint32_t len)
+    {
+        uint32_t sum = 0x43425352;      // "CBSR"
+        for (uint32_t i = 0; i < len; i++)
+            sum = (sum << 5) + sum + data[i];     // djb2
+        return sum;
+    }
+
+    static bool read_archive(uint8_t* data)
+    {
+        static_assert(SRAM_HEADER + VMU_ARCHIVE_SIZE <= SRAM_SIZE, "archive does not fit in SRAM");
+        uint8_t hdr[SRAM_HEADER];
+        for (uint32_t i = 0; i < SRAM_HEADER; i++)
+            hdr[i] = SRAM[i];
+        if (memcmp(hdr, "CBSR", 4) != 0 || read_le32(hdr + 4) != VMU_ARCHIVE_SIZE)
+        {
+            dbglog(DBG_INFO, "[SRAM] No saved data\n");
+            return false;
+        }
+        for (uint32_t i = 0; i < VMU_ARCHIVE_SIZE; i++)
+            data[i] = SRAM[SRAM_HEADER + i];
+        if (read_le32(hdr + 8) != archive_checksum(data, VMU_ARCHIVE_SIZE) ||
+            !check_header(data, VMU_ARCHIVE_SIZE))
+        {
+            dbglog(DBG_INFO, "[SRAM] Saved data damaged or from another program\n");
+            return false;
+        }
+        return true;
+    }
+
+    static bool write_archive(const uint8_t* data)
+    {
+        uint8_t hdr[SRAM_HEADER] = { 'C', 'B', 'S', 'R' };
+        write_le32(hdr + 4, VMU_ARCHIVE_SIZE);
+        write_le32(hdr + 8, archive_checksum(data, VMU_ARCHIVE_SIZE));
+        // Magic last: a power cut while writing leaves no valid header
+        SRAM[0] = 0;
+        for (uint32_t i = 0; i < VMU_ARCHIVE_SIZE; i++)
+            SRAM[SRAM_HEADER + i] = data[i];
+        for (uint32_t i = SRAM_HEADER - 1; i > 0; i--)
+            SRAM[i] = hdr[i];
+        SRAM[0] = hdr[0];
+        dbglog(DBG_INFO, "[SRAM] Saved %u bytes\n", (unsigned)VMU_ARCHIVE_SIZE);
+        return true;
+    }
+#else
     static bool read_archive(uint8_t* data)
     {
         int port = find_vmu_port();
@@ -506,6 +569,7 @@ namespace
         dbglog(DBG_INFO, "[VMU] Wrote %s (%d blocks)\n", VMU_ARCHIVE_FILE, padded / 512);
         return true;
     }
+#endif // __NAOMI__
 }
 
 bool vmu_load_scores(int list)
@@ -538,12 +602,14 @@ bool vmu_save_scores(int list)
 
 bool vmu_clear_scores()
 {
+#ifndef __NAOMI__
     int port = find_vmu_port();
     if (port < 0)
     {
         dbglog(DBG_INFO, "[VMU] No VMU card detected; skipping clear\n");
         return false;
     }
+#endif
 
     // Empty the score tables and keep the settings
     static uint8_t buf[VMU_ARCHIVE_SIZE];
