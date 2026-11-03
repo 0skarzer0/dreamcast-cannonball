@@ -34,7 +34,10 @@ if [ "$N" -lt 31 ]; then
     exit 1
 fi
 
-cp "$REPO/build-dc/cd/config.xml" "$RD/config.xml"
+# The disc's settings, with NAOMI defaults: no FPS counter, no VMU animation
+sed -e 's#<fps_counter>[0-9]*</fps_counter>#<fps_counter>0</fps_counter>#' \
+    -e 's#<vmu_animation>[0-9]*</vmu_animation>#<vmu_animation>0</vmu_animation>#' \
+    "$REPO/build-dc/cd/config.xml" > "$RD/config.xml"
 cp "$REPO/build-dc/res/tilemap.bin" "$REPO/build-dc/res/tilepatch.bin" "$RD/res/"
 # SDL's controller database is not needed on the NAOMI (no SDL controllers)
 
