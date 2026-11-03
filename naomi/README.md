@@ -44,6 +44,10 @@ naomi/render_audio.sh build-render/cannonball /path/to/outrun.zip build-naomi/di
 #   (Yamaha ADPCM: ffmpeg -i in.flac -ac 2 -ar 44100 -c:a adpcm_yamaha 1.wav)
 # optional: extra tracks for the music selection screen, as
 #   build-naomi/dimm/music/extra/1.wav ... plus tracks.txt ("1.wav|TITLE" per line)
+#   Level them with the recordings (about -19 LUFS) or they drown the effects:
+#   modern masters are ~8 dB louder. Custom/extra tracks play at volume 210,
+#   so encode them at about -17.5 LUFS, e.g. ffmpeg -af volume=<gain>dB, the
+#   gain from ffmpeg -af ebur128 (I: ... LUFS).
 naomi/pack_bin.py build-naomi/cannonball_naomi.bin build-naomi/dimm build-naomi/cannonball_full.bin
 gzip -9 build-naomi/cannonball_full.bin   # the WiPi netbooter wants .bin.gz
 ```
