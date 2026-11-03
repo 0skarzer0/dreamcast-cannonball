@@ -104,6 +104,8 @@ public:
 #ifdef __NAOMI__
     // NAOMI cabinet controls (JVS I/O board through the MIE), read once per frame
     void poll_naomi();
+    // The START button's lamp (JVS output 1 on the Crazy Taxi cabinet)
+    void naomi_start_lamp(bool on);
 #endif
 
 private:

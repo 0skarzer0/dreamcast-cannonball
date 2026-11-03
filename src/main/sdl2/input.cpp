@@ -604,4 +604,12 @@ void Input::poll_naomi()
     keys[MENU]      = menu_combo || (b & CONT_C) != 0;
     keys[VIEWPOINT] = view_combo;
 }
+void Input::naomi_start_lamp(bool on)
+{
+    static int last = -1;
+    if ((int)on == last)
+        return;
+    last = on;
+    mie_jvs_set_outputs(on ? MIE_JVS_OUTPUT_MASK(0) : 0, false);
+}
 #endif

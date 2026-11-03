@@ -184,6 +184,10 @@ static void process_events(void)
     // NAOMI: the cabinet controls come from the JVS I/O board through the
     // MIE, which SDL does not see. Read them directly every frame.
     input.poll_naomi();
+    // START lamp: flashes with "PRESS START" (title / attract), off otherwise
+    input.naomi_start_lamp(state == STATE_GAME &&
+                           outrun.game_state < GS_INIT_MUSIC &&
+                           outrun.outputs->is_set(OOutputs::D_START_LAMP));
 #endif
 }
 

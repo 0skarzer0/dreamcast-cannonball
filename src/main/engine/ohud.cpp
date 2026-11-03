@@ -507,11 +507,13 @@ void OHud::draw_insert_coin()
                     // Blit each tile
                     for (uint16_t i = 0; i < sizeof(PRESS_START); i++)
                         video.write_text16(&dst_addr, (0x8700 | PRESS_START[i]));
+                    outrun.outputs->set_digital(OOutputs::D_START_LAMP);    // free play: flash the lamp too
                 }
                 else
                 {
                     for (uint16_t i = 0; i < sizeof(PRESS_START); i++)
                         video.write_text16(&dst_addr, (0x8700 | 0x20));
+                    outrun.outputs->clear_digital(OOutputs::D_START_LAMP);
                 }
             }
             else
