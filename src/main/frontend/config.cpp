@@ -472,7 +472,7 @@ void Config::load()
     // Cabinet: real wheel and pedals, two-position shifter (low / high)
     controls.analog = 1;
     controls.gear   = controls.GEAR_SEPARATE;
-    // Arcade: straight into the game (attract mode); L + START opens
+    // Arcade: straight into the game (attract mode); BRAKE + START opens
     // the menu
     menu.enabled    = 0;
 #endif

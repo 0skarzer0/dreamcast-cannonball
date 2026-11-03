@@ -906,15 +906,8 @@ namespace
     // them. That worked in Flycast, but on a real Dreamcast the sprites and
     // text were still drawn over the lines, so the bars are drawn again,
     // solid black, at the end of the blended list, over everything.
-    void submit_scanline_quad(uint32_t alpha8, float z);
-
     void submit_scanline_bars(pvr_list_t list = PVR_LIST_OP_POLY)
     {
-        if (list == PVR_LIST_TR_POLY)
-        {
-            submit_scanline_quad(255, BAR_Z);   // solid black lines, one quad
-            return;
-        }
         pvr_poly_cxt_t cxt;
         pvr_poly_hdr_t hdr;
         pvr_poly_cxt_col(&cxt, list);
@@ -950,68 +943,6 @@ namespace
         }
     }
 
-    // Scanlines in the blended list as ONE quad with a repeating 8x8
-    // texture (even lines see-through, odd lines black at the given alpha)
-    // instead of 240 thin quads. The PVR sorts the blended list tile by tile
-    // (32x32 pixels): 240 strips put 16 more polygons in every tile, which
-    // slowed busy scenes (start line, stone arches) to 50 fps; one quad puts
-    // in one. Point sampled, so the lines stay exact.
-    pvr_ptr_t scan_tex   = NULL;
-    int       scan_alpha = -1;          // alpha the texture was built for
-
-    void submit_scanline_quad(uint32_t alpha8, float z)
-    {
-        const int a4 = (int)((alpha8 * 15 + 127) / 255);
-        if (!scan_tex)
-            scan_tex = pvr_mem_malloc(8 * 8 * 2);
-        if (!scan_tex)
-            return;
-        if (a4 != scan_alpha)
-        {
-            uint16_t pix[8 * 8];
-            for (int y = 0; y < 8; y++)
-                for (int x = 0; x < 8; x++)
-                    pix[y * 8 + x] = (y & 1) ? (uint16_t)(a4 << 12) : 0;   // ARGB4444, black
-            pvr_txr_load_ex(pix, scan_tex, 8, 8, PVR_TXRLOAD_16BPP);       // twiddled
-            scan_alpha = a4;
-        }
-
-        pvr_poly_cxt_t cxt;
-        pvr_poly_hdr_t hdr;
-        pvr_poly_cxt_txr(&cxt, PVR_LIST_TR_POLY, PVR_TXRFMT_ARGB4444 | PVR_TXRFMT_TWIDDLED,
-                         8, 8, scan_tex, PVR_FILTER_NONE);
-        cxt.gen.culling      = PVR_CULLING_NONE;
-        cxt.gen.shading      = PVR_SHADE_FLAT;
-        cxt.depth.comparison = PVR_DEPTHCMP_ALWAYS;
-        cxt.depth.write      = false;
-        cxt.blend.src        = PVR_BLEND_SRCALPHA;
-        cxt.blend.dst        = PVR_BLEND_INVSRCALPHA;
-        cxt.txr.env          = PVR_TXRENV_REPLACE;
-        cxt.txr.uv_clamp     = PVR_UVCLAMP_NONE;    // repeat down the screen
-        pvr_poly_compile(&hdr, &cxt);
-        submit_header(&hdr);
-
-        const float x0 = (float)(int)(xf.ox + 0.5f);
-        const float x1 = (float)(int)(GAME_W * xf.sx + xf.ox + 0.5f);
-        const int top = (int)(xf.oy + 0.5f);
-        const int bottom = (int)(GAME_H * xf.sy + xf.oy + 0.5f);
-        const float v1 = (float)(bottom - top) / 8.0f;     // one texel row per line
-        const float u1 = (x1 - x0) / 8.0f;
-        const float xs[4] = { x0, x1, x0, x1 };
-        const float ys[4] = { (float)top, (float)top, (float)bottom, (float)bottom };
-        const float us[4] = { 0.0f, u1, 0.0f, u1 };
-        const float vs[4] = { 0.0f, 0.0f, v1, v1 };
-        for (int i = 0; i < 4; i++)
-        {
-            pvr_vertex_t* v = (pvr_vertex_t*)pvr_dr_target();
-            v->flags = i == 3 ? PVR_CMD_VERTEX_EOL : PVR_CMD_VERTEX;
-            v->x = xs[i]; v->y = ys[i]; v->z = z;
-            v->u = us[i]; v->v = vs[i];
-            v->argb = 0xFFFFFFFF; v->oargb = 0;
-            pvr_dr_commit(v);
-        }
-    }
-
     // Scanlines: darken every second line of the 480-line display.
     // Drawn as flat-shaded translucent black bars on whole output lines
     // (no texture), so they stay crisp at any emulator internal resolution
@@ -1024,7 +955,39 @@ namespace
         const int pct = config.video.scanlines;
         if (pct <= 0) return;
         const uint32_t a = (uint32_t)(pct > 100 ? 100 : pct) * 255 / 100;
-        submit_scanline_quad(a, 3.0f);
+
+        pvr_poly_cxt_t cxt;
+        pvr_poly_hdr_t hdr;
+        pvr_poly_cxt_col(&cxt, PVR_LIST_TR_POLY);
+        cxt.gen.culling      = PVR_CULLING_NONE;
+        cxt.gen.shading      = PVR_SHADE_FLAT;
+        cxt.depth.comparison = PVR_DEPTHCMP_ALWAYS;
+        cxt.depth.write      = false;
+        cxt.blend.src        = PVR_BLEND_SRCALPHA;
+        cxt.blend.dst        = PVR_BLEND_INVSRCALPHA;
+        pvr_poly_compile(&hdr, &cxt);
+        submit_header(&hdr);
+
+        const float x0 = (float)(int)(xf.ox + 0.5f);
+        const float x1 = (float)(int)(GAME_W * xf.sx + xf.ox + 0.5f);
+        int top = (int)(xf.oy + 0.5f);
+        const int bottom = (int)(GAME_H * xf.sy + xf.oy + 0.5f);
+        const uint32_t col = a << 24;
+
+        for (int y = top + 1; y < bottom; y += 2)
+        {
+            const float ya = (float)y, yb = (float)(y + 1);
+            const float xs[4] = { x0, x1, x0, x1 }, ys[4] = { ya, ya, yb, yb };
+            for (int i = 0; i < 4; i++)
+            {
+                pvr_vertex_t* v = (pvr_vertex_t*)pvr_dr_target();
+                v->flags = i == 3 ? PVR_CMD_VERTEX_EOL : PVR_CMD_VERTEX;
+                v->x = xs[i]; v->y = ys[i]; v->z = 3.0f;
+                v->u = 0; v->v = 0;
+                v->argb = col; v->oargb = 0;
+                pvr_dr_commit(v);
+            }
+        }
     }
 
     // Leaderboard QR code over the high score screen: one quad with a
