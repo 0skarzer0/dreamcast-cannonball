@@ -507,8 +507,8 @@ void Input::set_rumble(bool enable, float strength)
 //   Shifter forward    low gear  (and UP in the menus)
 //   Shifter back       high gear (and DOWN in the menus)
 //   START              start / select
-//   BRAKE + START      main menu (also TEST on the service panel)
-//   ACCEL + START      change the view
+//   L + START          main menu (also TEST on the service panel)
+//   H + START          change the view
 // ------------------------------------------------------------------------------------------------
 #include <dc/maple.h>
 #include <dc/maple/controller.h>
@@ -592,14 +592,17 @@ void Input::poll_naomi()
     keys[DOWN]  = (b & CONT_DPAD_DOWN) != 0;
     keys[LEFT]  = steer < -64;
     keys[RIGHT] = steer >  64;
-    // The Crazy Taxi panel has a single button, START:
-    //   BRAKE + START        back to the main menu (TEST does the same)
-    //   ACCELERATOR + START  change the view (normal play: the foot is
-    //                        on the accelerator, so a tap changes view)
+    // The Crazy Taxi panel has a single button, START, so it combines with
+    // the shifter (hold the lever, then press START):
+    //   L (forward) + START  back to the main menu (TEST does the same)
+    //   H (back)    + START  change the view (H is the high gear, so
+    //                        shifting there does not slow the car)
     //   START alone          start / select, pause while driving
     const bool start      = (b & CONT_START) != 0;
-    const bool menu_combo = start && a_brake > 0x80;
-    const bool view_combo = start && !menu_combo && a_accel > 0x80;
+    const bool lever_l    = (b & CONT_DPAD_UP)   != 0;
+    const bool lever_h    = (b & CONT_DPAD_DOWN) != 0;
+    const bool menu_combo = start && lever_l;
+    const bool view_combo = start && lever_h;
     keys[START]     = start && !menu_combo && !view_combo;
     keys[MENU]      = menu_combo || (b & CONT_C) != 0;
     keys[VIEWPOINT] = view_combo;
