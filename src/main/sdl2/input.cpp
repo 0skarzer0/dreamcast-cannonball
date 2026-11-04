@@ -508,7 +508,7 @@ void Input::set_rumble(bool enable, float strength)
 //   Shifter back       high gear (and DOWN in the menus)
 //   START              start / select
 //   BRAKE + START      main menu (also TEST on the service panel)
-//   ACCEL + START      change the view
+//   START held + R     change the view (START acts on release)
 // ------------------------------------------------------------------------------------------------
 #include <dc/maple.h>
 #include <dc/maple/controller.h>
@@ -586,23 +586,40 @@ void Input::poll_naomi()
     // Shifter (springs back to the middle): forward (D) = low gear,
     // back (R) = high gear. Also UP/DOWN in the menus.
     const uint32_t b = c.buttons;
-    keys[GEAR1] = (b & CONT_DPAD_UP)   != 0;
-    keys[GEAR2] = (b & CONT_DPAD_DOWN) != 0;
-    keys[UP]    = (b & CONT_DPAD_UP)   != 0;
-    keys[DOWN]  = (b & CONT_DPAD_DOWN) != 0;
-    keys[LEFT]  = steer < -64;
-    keys[RIGHT] = steer >  64;
+    const bool fwd   = (b & CONT_DPAD_UP)   != 0;
+    const bool back  = (b & CONT_DPAD_DOWN) != 0;
+    const bool start = (b & CONT_START) != 0;
     // The Crazy Taxi panel has a single button, START:
     //   BRAKE + START        back to the main menu (TEST does the same)
-    //   ACCELERATOR + START  change the view (normal play: the foot is
-    //                        on the accelerator, so a tap changes view)
-    //   START alone          start / select, pause while driving
-    const bool start      = (b & CONT_START) != 0;
+    //   START held + R       change the view (the shifter does not change
+    //                        gear while START is held)
+    //   START alone          start / select, pause while driving; acts on
+    //                        release, so a foot on the accelerator does not
+    //                        get in the way
+    static bool start_was = false;
+    static bool start_combo = false;    // this START press was a combination
+    static int  start_pulse = 0;        // polls left with START reported
+    if (start && !start_was)
+        start_combo = false;
     const bool menu_combo = start && a_brake > 0x80;
-    const bool view_combo = start && !menu_combo && a_accel > 0x80;
-    keys[START]     = start && !menu_combo && !view_combo;
+    const bool view_combo = start && !menu_combo && back;
+    if (menu_combo || view_combo)
+        start_combo = true;
+    if (!start && start_was && !start_combo)
+        start_pulse = 4;
+    start_was = start;
+
+    keys[GEAR1] = fwd  && !start;
+    keys[GEAR2] = back && !start;
+    keys[UP]    = fwd  && !start;
+    keys[DOWN]  = back && !start;
+    keys[LEFT]  = steer < -64;
+    keys[RIGHT] = steer >  64;
+    keys[START]     = start_pulse > 0;
     keys[MENU]      = menu_combo || (b & CONT_C) != 0;
     keys[VIEWPOINT] = view_combo;
+    if (start_pulse > 0)
+        start_pulse--;
 }
 void Input::naomi_start_lamp(bool on)
 {

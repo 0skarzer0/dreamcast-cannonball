@@ -32,9 +32,9 @@ Para compilar y empaquetar, ver [README.md](README.md).
 | Volante | Dirección (y izquierda/derecha en menús) |
 | Acelerador / freno | Pedales analógicos |
 | Palanca adelante / atrás | Marcha corta / larga (arriba/abajo en menús) |
-| START | Empezar / seleccionar (la luz de START parpadea en el título) |
+| START | Empezar / seleccionar / pausa; actúa al **soltarlo**, así que funciona aunque el acelerador esté pisado (la luz parpadea en el título) |
 | **Freno + START** | Menú principal (también TEST del panel de servicio) |
-| Acelerador + START | Cambiar la cámara |
+| START mantenido + R (palanca atrás) | Cambiar la cámara (con START pulsado la palanca no cambia de marcha) |
 
 Calibración (valores JVS medidos en el mueble, 2026-11-02; se amplían solos si un control llega más lejos):
 volante 8448 / 33792 / 60160, acelerador 11776–47104, freno 14080–47360, margen de pedales 6 %.
