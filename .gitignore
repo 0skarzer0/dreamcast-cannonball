@@ -264,3 +264,5 @@ pip-log.txt
 .DS_Store
 old_version
 
+# errores de los encargos al equipo (agy)
+.agy-tasks/*.err
