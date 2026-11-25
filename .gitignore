@@ -264,5 +264,6 @@ pip-log.txt
 .DS_Store
 old_version
 
-# errores de los encargos al equipo (agy)
-.agy-tasks/*.err
+# equipo (agy): se sube solo la plantilla; encargos, respuestas, _estado.md y .err se quedan en local
+.agy-tasks/*
+!.agy-tasks/_plantilla.md
